@@ -9,7 +9,7 @@ function App() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const ws = new WebSocket("ws://localhost:8080");
+    const ws = new WebSocket("https://chat-room-be-4.onrender.com");
     ws.onopen = () => {
       setSocket(ws); // when connection is open, set socket state
     };
