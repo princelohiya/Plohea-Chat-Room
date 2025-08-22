@@ -97,12 +97,6 @@ function App() {
           >
             Send
           </button>
-          <button
-            onClick={eraseMessages}
-            className="hidden sm:block ml-2 px-4 py-2 rounded-md text-white bg-red-900 hover:bg-red-700 cursor-pointer transition"
-          >
-            Erase
-          </button>
         </div>
       </div>
       <div>
