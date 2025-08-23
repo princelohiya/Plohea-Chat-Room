@@ -13,7 +13,7 @@ function App() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const ws = new WebSocket("ws://localhost:8080"); // replace with your server URL
+    const ws = new WebSocket("https://chat-room-be-4.onrender.com"); // replace with your server URL
     ws.onopen = () => {
       setSocket(ws); // when connection is open, set socket state
     };
