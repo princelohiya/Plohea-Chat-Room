@@ -9,16 +9,33 @@ function App() {
   >([]);
   const [input, setInput] = useState("");
   const [userLabel, setUserLabel] = useState<string | null>(null);
+  const [rejection, setRejection] = useState<string | null>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const ws = new WebSocket("https://chat-room-be-4.onrender.com"); // replace with your server URL
+    // ws://localhost:8080 for local testing
+    const ws = new WebSocket("ws://localhost:8080"); // replace with your server URL
+
     ws.onopen = () => {
       setSocket(ws); // when connection is open, set socket state
     };
 
     ws.onmessage = (event) => {
+      try {
+        const parsed = JSON.parse(event.data);
+        if (
+          parsed.type === "server" &&
+          parsed.message === "Session ended by user."
+        ) {
+          setRejection("This session has ended for both clients.");
+          ws.close();
+          return;
+        }
+        // ...rest as normal
+      } catch {
+        /* ... */
+      }
       try {
         const parsed = JSON.parse(event.data);
         if (parsed.type === "assign") {
@@ -57,6 +74,14 @@ function App() {
     }
   };
 
+  if (rejection) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-900 text-white text-xl">
+        {rejection}
+      </div>
+    );
+  }
+
   if (!socket) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-gray-950 text-white">
@@ -89,8 +114,8 @@ function App() {
                 className={`flex justify-center items-center rounded-full h-10 w-10 mr-3 
         ${
           msg.label === userLabel
-            ? "bg-slate-400 text-white" // highlight self
-            : "bg-slate-400 text-white"
+            ? "bg-green-700 text-white"
+            : "bg-blue-700 text-white"
         }`}
               >
                 <span className="text-xl font-bold">{msg.label}</span>
@@ -126,8 +151,27 @@ function App() {
           </button>
         </div>
       </div>
-      <div>
-        <p className="text-gray-400 text-sm mt-4">
+      <div className="text-center mb-6">
+        <button
+          onClick={() => {
+            if (socket) {
+              socket.send(JSON.stringify({ type: "disconnect_all" }));
+            }
+          }}
+          className={`ml-2 px-4 py-2 rounded-md text-white transition bg-red-400 hover:bg-red-700 hover:drop-shadow-lg`}
+        >
+          Disconnect All
+        </button>
+        <button
+          onClick={() => {
+            //clear chat by closing the socket (server clears chat on disconnect)
+            setMessages([]);
+          }}
+          className={`ml-2 px-4 py-2 rounded-md text-white transition bg-blue-600 hover:bg-blue-700 hover:drop-shadow-lg`}
+        >
+          Clear Chat
+        </button>
+        <p className="text-gray-400 text-sm mt-4 max-w-md">
           Note: Speak in this void, where trust is true. No logs, no trails—your
           words slip through.
         </p>
