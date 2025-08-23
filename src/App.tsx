@@ -15,7 +15,8 @@ function App() {
 
   useEffect(() => {
     // ws://localhost:8080 for local testing
-    const ws = new WebSocket("ws://localhost:8080"); // replace with your server URL
+    // https://chat-room-be-4.onrender.com for deployed server
+    const ws = new WebSocket("https://chat-room-be-4.onrender.com"); // replace with your server URL
 
     ws.onopen = () => {
       setSocket(ws); // when connection is open, set socket state
