@@ -11,7 +11,7 @@ function App() {
   const [userLabel, setUserLabel] = useState<string | null>(null);
   const [rejection, setRejection] = useState<string | null>(null);
 
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     // ws://localhost:8080 for local testing
@@ -72,6 +72,9 @@ function App() {
       socket.send(input);
       setInput("");
       inputRef.current?.focus();
+      if (inputRef.current) {
+        inputRef.current.style.height = "40px"; // reset to default height
+      }
     }
   };
 
@@ -100,7 +103,7 @@ function App() {
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 p-6">
       <div className="text-center">
         <h1 className="text-3xl font-bold text-white mb-6">Plohea Chat Room</h1>
-        <h2 className="font-bold text-white mb-6">
+        <h2 className="font-bold text-white mb-6 max-w-md">
           In shadows deep, where trust is sworn, Your name’s erased, your mask
           is worn. Speak your heart, no fear of blame, The void protects your
           hidden flame.
@@ -112,31 +115,37 @@ function App() {
           {messages.map((msg, index) => (
             <div className="flex items-start mb-2" key={index}>
               <div
-                className={`flex justify-center items-center rounded-full h-10 w-10 mr-3 
-        ${
-          msg.label === userLabel
-            ? "bg-green-700 text-white"
-            : "bg-blue-700 text-white"
-        }`}
+                className={`flex justify-center items-center rounded-full h-10 w-10 mr-3 flex-shrink-0 ${
+                  msg.label === userLabel
+                    ? "bg-green-700 text-white"
+                    : "bg-blue-700 text-white"
+                }`}
               >
-                <span className="text-xl font-bold">{msg.label}</span>
+                <span className="text-xl ">{msg.label}</span>
               </div>
-              <div className="mb-2 p-2 rounded-md bg-gray-700 max-w-max break-words">
+              <div className="mb-2 p-2 rounded-md bg-gray-700 max-w-md break-words whitespace-pre-wrap">
                 {msg.message}
               </div>
             </div>
           ))}
         </div>
         <div className="flex items-center border-t border-gray-700 pt-4">
-          <input
+          <textarea
             ref={inputRef}
-            type="text"
-            className="flex-1 bg-gray-900 text-white px-4 py-2 rounded-md outline-none focus:ring focus:ring-blue-500 hover:drop-shadow-lg"
+            className="flex-1 min-h-[40px] max-h-[200px] bg-gray-900 text-white px-4 py-2 rounded-md outline-none focus:ring focus:ring-blue-500 resize-none overflow-hidden"
             placeholder="Type a message..."
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter") sendMessage();
+              if (e.key === "Enter") {
+                e.preventDefault();
+                sendMessage();
+              }
+            }}
+            onInput={(e: React.ChangeEvent<HTMLTextAreaElement>) => {
+              const textarea = e.target;
+              textarea.style.height = "auto"; // reset
+              textarea.style.height = `${textarea.scrollHeight}px`; // grow
             }}
           />
           <button
@@ -172,13 +181,13 @@ function App() {
         >
           Clear Chat
         </button>
-        <p className="text-gray-400 text-sm mt-4 max-w-md">
-          Note: Speak in this void, where trust is true. No logs, no trails—your
-          words slip through.
+        <p className="text-gray-400 text-sm mt-6 max-w-xs">
+          Note: No eyes to see, no names to know, Trust this place where secrets
+          flow.
         </p>
       </div>
       <div>
-        <p className="text-gray-400 text-sm mt-50">
+        <p className="text-gray-400 text-sm mt-30">
           Made with ❤️ by Prince lohia
         </p>
       </div>
