@@ -10,47 +10,62 @@ function App() {
   const [input, setInput] = useState("");
   const [userLabel, setUserLabel] = useState<string | null>(null);
   const [rejection, setRejection] = useState<string | null>(null);
+  const [isTyping, setIsTyping] = useState(false);
+  const [otherIsTyping, setOtherIsTyping] = useState(false);
+
+  let typingTimeout = useRef<NodeJS.Timeout | null>(null);
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     // ws://localhost:8080 for local testing
     // https://chat-room-be-4.onrender.com for deployed server
-    const ws = new WebSocket("https://chat-room-be-4.onrender.com"); // replace with your server URL
+    const ws = new WebSocket("ws://localhost:8080"); // replace with your server URL
 
     ws.onopen = () => {
       setSocket(ws); // when connection is open, set socket state
+      ws.send("connected"); // test message
     };
 
     ws.onmessage = (event) => {
+      let parsed;
       try {
-        const parsed = JSON.parse(event.data);
-        if (
-          parsed.type === "server" &&
-          parsed.message === "Session ended by user."
-        ) {
-          setRejection("This session has ended for both clients.");
-          ws.close();
-          return;
-        }
-        // ...rest as normal
+        parsed = JSON.parse(event.data);
+        console.log("Received :", parsed);
       } catch {
-        /* ... */
-      }
-      try {
-        const parsed = JSON.parse(event.data);
-        if (parsed.type === "assign") {
-          setUserLabel(parsed.label); // "A" or "B"
-        } else if (parsed.type === "chat") {
-          // message sent in the room, comes with a label and message
-          setMessages((prev) => [
-            ...prev,
-            { label: parsed.label, message: parsed.message },
-          ]);
-        }
-      } catch {
-        // fallback in case the message is not JSON
+        // fallback for plain text
         setMessages((prev) => [...prev, { label: "?", message: event.data }]);
+        return;
+      }
+
+      if (
+        parsed.type === "server" &&
+        parsed.message === "Session ended by user."
+      ) {
+        setRejection(
+          "This session has ended for both clients. Refresh to start a new one."
+        );
+        ws.close();
+        return;
+      }
+
+      if (parsed.type === "assign") {
+        setUserLabel(parsed.label); // "A" or "B"
+      } else if (parsed.type === "chat") {
+        setMessages((prev) => [
+          ...prev,
+          { label: parsed.label, message: parsed.message },
+        ]);
+      } else if (parsed.type === "typing") {
+        setOtherIsTyping(parsed.status);
+
+        if (userLabel && parsed.label !== userLabel) {
+          if (typingTimeout.current) clearTimeout(typingTimeout.current);
+
+          typingTimeout.current = setTimeout(() => {
+            setOtherIsTyping(false);
+          }, 1000);
+        }
       }
     };
 
@@ -70,12 +85,32 @@ function App() {
   const sendMessage = () => {
     if (input.trim() && socket) {
       socket.send(input);
+      setOtherIsTyping(false);
       setInput("");
       inputRef.current?.focus();
       if (inputRef.current) {
         inputRef.current.style.height = "40px"; // reset to default height
       }
     }
+  };
+
+  const handleTyping = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    setInput(value);
+
+    if (!isTyping && socket) {
+      setIsTyping(true);
+      socket.send(JSON.stringify({ type: "typing", status: true }));
+    }
+
+    if (typingTimeout.current) clearTimeout(typingTimeout.current);
+
+    typingTimeout.current = setTimeout(() => {
+      setIsTyping(false);
+      if (socket) {
+        socket.send(JSON.stringify({ type: "typing", status: false }));
+      }
+    }, 1200);
   };
 
   if (rejection) {
@@ -129,13 +164,19 @@ function App() {
             </div>
           ))}
         </div>
+        {otherIsTyping && (
+          <div className="italic text-gray-400 mb-2">
+            The other user is typing…
+          </div>
+        )}
         <div className="flex items-center border-t border-gray-700 pt-4">
           <textarea
             ref={inputRef}
             className="flex-1 min-h-[40px] max-h-[200px] bg-gray-900 text-white px-4 py-2 rounded-md outline-none focus:ring focus:ring-blue-500 resize-none overflow-hidden"
             placeholder="Type a message..."
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            rows={1}
+            onChange={handleTyping}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 e.preventDefault();
@@ -144,7 +185,7 @@ function App() {
             }}
             onInput={(e: React.ChangeEvent<HTMLTextAreaElement>) => {
               const textarea = e.target;
-              textarea.style.height = "auto"; // reset
+              // textarea.style.height = "auto"; // reset
               textarea.style.height = `${textarea.scrollHeight}px`; // grow
             }}
           />
