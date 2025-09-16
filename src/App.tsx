@@ -24,7 +24,7 @@ function App() {
 
     ws.onopen = () => {
       setSocket(ws); // when connection is open, set socket state
-      ws.send("connected"); // test message
+      ws.send("You are connected ;)");
     };
 
     ws.onmessage = (event) => {
@@ -66,6 +66,12 @@ function App() {
             setOtherIsTyping(false);
           }, 1000);
         }
+      }
+
+      if (parsed.type === "server" && parsed.message === "Room is full.") {
+        setRejection("Room is full. Please try again later.");
+        ws.close();
+        return;
       }
     };
 
@@ -137,7 +143,7 @@ function App() {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 p-6">
       <div className="text-center">
-        <h1 className="text-3xl font-bold text-white mb-6">Plohea Chat Room</h1>
+        <h1 className="text-3xl font-bold text-white mb-6 ">CY EBHZ</h1>
         <h2 className="font-bold text-white mb-6 max-w-md">
           In shadows deep, where trust is sworn, Your name’s erased, your mask
           is worn. Speak your heart, no fear of blame, The void protects your
@@ -194,7 +200,7 @@ function App() {
             disabled={!input}
             className={`ml-2 px-4 py-2 rounded-md text-white transition ${
               input.trim()
-                ? "bg-slate-600 hover:bg-slate-700"
+                ? "bg-slate-600 hover:bg-sl3ate-700"
                 : "bg-gray-600 cursor-not-allowed"
             } hover:drop-shadow-lg`}
           >
@@ -228,9 +234,7 @@ function App() {
         </p>
       </div>
       <div>
-        <p className="text-gray-400 text-sm mt-30">
-          Made with ❤️ by Prince lohia
-        </p>
+        <p className="text-gray-400 text-sm mt-30">Made with ❤️ by Anonymous</p>
       </div>
     </div>
   );
