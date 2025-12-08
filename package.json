@@ -10,7 +10,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@emoji-mart/data": "^1.2.1",
+    "@emoji-mart/react": "^1.1.1",
     "@tailwindcss/vite": "^4.1.12",
+    "framer-motion": "^12.23.25",
     "react": "^19.1.1",
     "react-dom": "^19.1.1"
   },

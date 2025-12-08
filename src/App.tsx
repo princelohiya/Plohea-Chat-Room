@@ -12,15 +12,24 @@ function App() {
   const [rejection, setRejection] = useState<string | null>(null);
   const [isTyping, setIsTyping] = useState(false);
   const [otherIsTyping, setOtherIsTyping] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   let typingTimeout = useRef<NodeJS.Timeout | null>(null);
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
+  // ---- Auto-scroll to bottom on new messages ----
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages]);
+
+  // ---- WebSocket setup ----
   useEffect(() => {
     // ws://localhost:8080 for local testing
     // https://chat-room-be-4.onrender.com for deployed server
-    const ws = new WebSocket("https://chat-room-be-4.onrender.com"); // replace with your server URL
+    const ws = new WebSocket("ws://localhost:8080"); // replace with your server URL
 
     ws.onopen = () => {
       setSocket(ws); // when connection is open, set socket state
@@ -38,6 +47,7 @@ function App() {
         return;
       }
 
+      // server messages
       if (
         parsed.type === "server" &&
         parsed.message === "Session ended by user."
@@ -49,14 +59,24 @@ function App() {
         return;
       }
 
+      // label assignment and chat messages
+
+      // label assign
       if (parsed.type === "assign") {
         setUserLabel(parsed.label); // "A" or "B"
-      } else if (parsed.type === "chat") {
+        return;
+      }
+
+      // incoming chat
+      if (parsed.type === "chat") {
         setMessages((prev) => [
           ...prev,
           { label: parsed.label, message: parsed.message },
         ]);
-      } else if (parsed.type === "typing") {
+        return;
+      }
+      // typing status
+      if (parsed.type === "typing") {
         setOtherIsTyping(parsed.status);
 
         if (userLabel && parsed.label !== userLabel) {
@@ -88,6 +108,7 @@ function App() {
     };
   }, []);
 
+  // ---- send message ----
   const sendMessage = () => {
     if (input.trim() && socket) {
       socket.send(input);
@@ -100,6 +121,7 @@ function App() {
     }
   };
 
+  // ---- typing handler ----
   const handleTyping = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
     setInput(value);
@@ -119,6 +141,7 @@ function App() {
     }, 1200);
   };
 
+  // ---- rejection screen ----
   if (rejection) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-900 text-white text-xl">
@@ -127,6 +150,7 @@ function App() {
     );
   }
 
+  // ---- loading screen ----
   if (!socket) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-gray-950 text-white">
@@ -140,33 +164,70 @@ function App() {
     );
   }
 
+  // ---- main UI ----
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 p-6">
-      <div className="text-center">
-        <h1 className="text-3xl font-bold text-white mb-6 ">CY EBHZ</h1>
-        <h2 className="font-bold text-white mb-6 max-w-md">
-          In shadows deep, where trust is sworn, Your name’s erased, your mask
-          is worn. Speak your heart, no fear of blame, The void protects your
-          hidden flame.
-        </h2>
+      {/* --- Redesigned Header (Modern UI) --- */}
+      <div className="w-full max-w-md mb-5">
+        <div className="flex items-center justify-between bg-gray-800 px-4 py-3 rounded-xl border border-gray-700 shadow-lg">
+          {/* Left Side */}
+          <div className="flex items-center gap-3">
+            <span className="text-green-400 text-lg">🟢</span>{" "}
+            {/* Status Indicator */}
+            <h1 className="text-2xl font-semibold text-white">Secure Chat</h1>
+          </div>
+
+          {/* Right Side Icons */}
+          <div className="flex items-center gap-3 text-gray-400">
+            <span title="Encrypted" className="cursor-default text-lg">
+              🔒
+            </span>
+          </div>
+        </div>
+
+        <p className="text-center text-gray-400 text-sm mt-3">
+          Speak freely — private, anonymous, encrypted.
+        </p>
       </div>
+
       <div className="w-full max-w-md bg-gray-800 rounded-lg shadow-lg p-6 flex flex-col hover:shadow-2xl transition-shadow duration-300 mb-4 ">
         <div className="flex-1 overflow-y-auto mb-4 text-white">
           <div className="text-gray-400 mb-2">Messages:</div>
           {messages.map((msg, index) => (
-            <div className="flex items-start mb-2" key={index}>
+            <div
+              key={index}
+              className={`flex items-start mb-2 ${
+                msg.label === userLabel ? "justify-end" : "justify-start"
+              }`} // ⭐ ADDED: aligns A right, B left
+            >
+              {/* If message is from other user (B), avatar stays left */}
+              {msg.label !== userLabel && (
+                <div
+                  className={`flex justify-center items-center rounded-full h-10 w-10 mr-3 flex-shrink-0 ${
+                    msg.label === userLabel
+                      ? "bg-green-700 text-white"
+                      : "bg-blue-700 text-white"
+                  }`}
+                >
+                  <span className="text-xl">{msg.label}</span>
+                </div>
+              )}
+
+              {/* Bubble */}
               <div
-                className={`flex justify-center items-center rounded-full h-10 w-10 mr-3 flex-shrink-0 ${
-                  msg.label === userLabel
-                    ? "bg-green-700 text-white"
-                    : "bg-blue-700 text-white"
-                }`}
+                className={`mb-2 p-2 rounded-md max-w-md break-words whitespace-pre-wrap bg-gray-700`} // ⭐ Optional: color difference for sender
               >
-                <span className="text-xl ">{msg.label}</span>
-              </div>
-              <div className="mb-2 p-2 rounded-md bg-gray-700 max-w-md break-words whitespace-pre-wrap">
                 {msg.message}
               </div>
+
+              {/* If message belongs to current user (A), avatar moves to right */}
+              {msg.label === userLabel && (
+                <div
+                  className={`flex justify-center items-center rounded-full h-10 w-10 ml-3 flex-shrink-0 bg-green-700 text-white`}
+                >
+                  <span className="text-xl">{msg.label}</span>
+                </div>
+              )}
             </div>
           ))}
         </div>
