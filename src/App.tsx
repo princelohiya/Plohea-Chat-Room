@@ -13,9 +13,6 @@ import {
   Trash2,
   LogOut,
   KeyRound,
-  LucideBadgeIndianRupee,
-  LucideAlarmCheck,
-  LucideCheckCheck,
   LucideCheck, // Added Key Icon
 } from "lucide-react";
 
