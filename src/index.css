@@ -1,1 +1,14 @@
 @import "tailwindcss";
+
+#msgcontainer::-webkit-scrollbar {
+  /* overflow-y: auto; */
+  /* display: none; */
+  background-color: transparent;
+  /* scrollbar-width: thin; */
+  width: 8px;
+}
+
+#msgcontainer::-webkit-scrollbar-thumb {
+  background-color: #374151; /* Tailwind's gray-700 */
+  border-radius: 10px;
+}
