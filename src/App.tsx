@@ -61,8 +61,8 @@ function App() {
 
   // WebSocket setup
   useEffect(() => {
-    const url = "ws://localhost:8080";
-    // const url = "https://chat-room-be-4.onrender.com";
+    // const url = "ws://localhost:8080";
+    const url = "https://chat-room-be-4.onrender.com";
     const ws = new WebSocket(url);
 
     ws.onopen = () => {
