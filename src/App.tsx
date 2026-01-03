@@ -12,7 +12,6 @@ import {
   Lock,
   Trash2,
   LogOut,
-  AlertCircle,
   KeyRound, // Added Key Icon
 } from "lucide-react";
 
