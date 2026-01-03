@@ -12,7 +12,11 @@ import {
   Lock,
   Trash2,
   LogOut,
-  KeyRound, // Added Key Icon
+  KeyRound,
+  LucideBadgeIndianRupee,
+  LucideAlarmCheck,
+  LucideCheckCheck,
+  LucideCheck, // Added Key Icon
 } from "lucide-react";
 
 function App() {
@@ -158,8 +162,14 @@ function App() {
 
   if (rejection)
     return (
-      <div className="bg-gray-900 text-slate-300 h-screen right-4 ">
-        {rejection}
+      <div className="bg-gray-900 text-slate-300 h-screen right-4 flex justify-center items-center  border-t-4 border-emerald-500  ">
+        <span className="animate-pulse rounded-full border-2 p-4 font-sans text-2xl">
+          <LucideCheck
+            className="inline mr-2 mb-1.5 text-emerald-500"
+            size={30}
+          />
+          {rejection}
+        </span>
       </div>
     );
   if (!socket)
@@ -190,7 +200,7 @@ function App() {
               </div>
             </div>
 
-            <div className="flex gap-2">
+            <div id="top-right-container" className="flex gap-2">
               {/* Key Toggle Button */}
               <button
                 onClick={() => setShowKeyInput(!showKeyInput)}
@@ -243,7 +253,7 @@ function App() {
                     placeholder="Enter a shared secret..."
                   />
                 </div>
-                <p className="text-[10px] text-gray-500 mt-1 ml-1">
+                <p className="text-[12px] font-bold text-gray-500 mt-1 ml-1">
                   * Must match the other user's key to read messages.
                 </p>
               </motion.div>
@@ -305,6 +315,27 @@ function App() {
               </motion.div>
             );
           })}
+          {/* 2. PASTE THIS MISSING BLOCK HERE 👇 */}
+          <AnimatePresence>
+            {otherIsTyping && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                className="flex items-center gap-2 ml-10 mb-4"
+              >
+                <div className="bg-gray-800 border border-gray-700 px-3 py-2 rounded-xl rounded-tl-sm flex gap-1 shadow-sm">
+                  <span className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                  <span className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                  <span className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce"></span>
+                </div>
+                <span className="text-xs text-gray-500 animate-pulse font-mono">
+                  typing...
+                </span>
+              </motion.div>
+            )}
+          </AnimatePresence>
+          {/* 👆 END OF PASTE */}' ?'
           <div ref={messagesEndRef} />
         </div>
 
