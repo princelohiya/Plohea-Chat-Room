@@ -64,8 +64,8 @@ function App() {
 
   // WebSocket setup
   useEffect(() => {
-    const url = "ws://localhost:8080";
-    // const url = "https://chat-room-be-4.onrender.com";
+    // const url = "ws://localhost:8080";
+    const url = "https://chat-room-be-4.onrender.com";
     const ws = new WebSocket(url);
 
     ws.onopen = () => {
@@ -140,9 +140,6 @@ function App() {
     };
 
     return () => ws.close();
-
-    // 🚨 FIX 3: Dependency array is EMPTY.
-    // Socket will NOT reconnect when key changes.
   }, []);
 
   // 4. ENCRYPT OUTGOING MESSAGES
@@ -208,9 +205,11 @@ function App() {
                 </h1>
                 <div className="flex items-center gap-2 text-xs font-mono mt-0.5">
                   <div className="flex items-center gap-1 text-emerald-500">
-                    <Lock className="w-3 h-3" />
-                    <span className="hidden sm:inline">E2E ENCRYPTED</span>
-                    <span className="sm:hidden">E2E</span>
+                    <Lock className="w-3 h-3 animate-pulse" />
+                    <span className="hidden sm:inline animate-pulse">
+                      E2E ENCRYPTED
+                    </span>
+                    <span className="sm:hidden animate-pulse">E2E</span>
                   </div>
                   <span className="text-gray-600">•</span>
                   <div className="flex items-center gap-1 bg-gray-800 px-1.5 py-0.5 rounded-full border border-gray-700">
@@ -328,6 +327,25 @@ function App() {
               </motion.div>
             );
           })}
+          <AnimatePresence>
+            {otherIsTyping && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                className="flex items-center gap-2 ml-10 mb-4"
+              >
+                <div className="bg-gray-800 border border-gray-700 px-3 py-2 rounded-xl rounded-tl-sm flex gap-1 shadow-sm">
+                  <span className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                  <span className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                  <span className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce"></span>
+                </div>
+                <span className="text-xs text-gray-500 animate-pulse font-mono">
+                  typing...
+                </span>
+              </motion.div>
+            )}
+          </AnimatePresence>
           <div ref={messagesEndRef} />
         </div>
 
