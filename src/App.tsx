@@ -44,6 +44,7 @@ function App() {
   // ---- Debounce Logic ----
   useEffect(() => {
     // Set a timer to update the real key after 500ms
+
     const handler = setTimeout(() => {
       setSecretKey(keyInputValue);
     }, 1000);
@@ -171,8 +172,11 @@ function App() {
     );
   if (!socket)
     return (
-      <div className="text-white p-10 bg-gray-900 h-screen flex justify-center items-center">
-        <Spinner />
+      <div className="text-white p-10 bg-gray-900 h-screen flex justify-center items-center ">
+        <div className="flex flex-col items-center p-6 rounded-lg shadow-lg space-y-3 animate-pulse">
+          <Spinner />
+          <p className="text-xl">Please wait, connecting to server...</p>
+        </div>
       </div>
     );
 
@@ -312,7 +316,6 @@ function App() {
               </motion.div>
             );
           })}
-          {/* 2. PASTE THIS MISSING BLOCK HERE 👇 */}
           <AnimatePresence>
             {otherIsTyping && (
               <motion.div
@@ -332,7 +335,6 @@ function App() {
               </motion.div>
             )}
           </AnimatePresence>
-          {/* 👆 END OF PASTE */}' ?'
           <div ref={messagesEndRef} />
         </div>
 
