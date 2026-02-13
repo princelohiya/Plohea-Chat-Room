@@ -4,7 +4,6 @@ import { Spinner } from "./components/Spinner";
 import { motion, AnimatePresence } from "framer-motion";
 import AES from "crypto-js/aes";
 import enc from "crypto-js/enc-utf8";
-import { Toaster, toast } from "react-hot-toast";
 
 import {
   Send,
@@ -13,64 +12,53 @@ import {
   Trash2,
   Users,
   LogOut,
-  KeyRound,
-  LucideCheck,
+  Hash,
+  ArrowRight,
+  AlertTriangle,
+  KeyRoundIcon,
+  ShieldUser,
 } from "lucide-react";
 
 function App() {
+  // --- STATE ---
+  const [roomId, setRoomId] = useState<string | null>(null);
+  const [roomInput, setRoomInput] = useState("");
   const [socket, setSocket] = useState<null | WebSocket>(null);
   const [messages, setMessages] = useState<
-    { label: string; message: string }[]
+    { label: string; message: string; isEncrypted?: boolean }[]
   >([]);
   const [input, setInput] = useState("");
-
-  const [secretKey, setSecretKey] = useState("default-secure-key");
-  const [keyInputValue, setKeyInputValue] = useState("default-secure-key");
-  const [showKeyInput, setShowKeyInput] = useState(false);
-
   const [userLabel, setUserLabel] = useState<string | null>(null);
   const [rejection, setRejection] = useState<string | null>(null);
   const [isTyping, setIsTyping] = useState(false);
   const [otherIsTyping, setOtherIsTyping] = useState(false);
   const [onlineCount, setOnlineCount] = useState(0);
+  const [showKeyInput, setShowKeyInput] = useState(false);
 
+  // --- REFS ---
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
-  let typingTimeout = useRef<NodeJS.Timeout | null>(null);
+  const typingTimeout = useRef<NodeJS.Timeout | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const roomIdRef = useRef(roomId);
 
-  // 🚨 FIX 1: Use a Ref to track the key without triggering re-renders or reconnects
-  const secretKeyRef = useRef(secretKey);
-
-  // Sync the Ref whenever state changes
   useEffect(() => {
-    secretKeyRef.current = secretKey;
-  }, [secretKey]);
+    roomIdRef.current = roomId;
+  }, [roomId]);
 
-  // ---- Debounce Logic ----
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setSecretKey(keyInputValue);
-      if (keyInputValue !== secretKey) {
-        toast.success("Key updated!");
-      }
-    }, 1000);
-    return () => clearTimeout(handler);
-  }, [keyInputValue]); // Removed secretKey from deps to avoid loop
-
-  // Auto-scroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, otherIsTyping]);
 
-  // WebSocket setup
+  // ---- WebSocket Connection ----
   useEffect(() => {
-    // const url = "ws://localhost:8080";
-    const url = "https://chat-room-be-4.onrender.com";
+    if (!roomId) return;
+    const url = `ws://localhost:8080?room=${roomId}`;
+    // const url = `https://chat-room-be-4.onrender.com?room=${roomId}`;
+
     const ws = new WebSocket(url);
 
     ws.onopen = () => {
       setSocket(ws);
-      console.log("Connected to WebSocket");
       ws.send("You are connected ;)");
     };
 
@@ -79,13 +67,10 @@ function App() {
       try {
         parsed = JSON.parse(event.data);
       } catch (e) {
-        // 🚨 DEBUG: If you see this in console, your backend sent "Sticky Packets"
-        console.error("JSON Parse Error:", event.data);
         setMessages((prev) => [...prev, { label: "?", message: event.data }]);
         return;
       }
 
-      // 1. Handle User Count
       if (parsed.type === "user_count") {
         setOnlineCount(parsed.count);
         return;
@@ -105,29 +90,47 @@ function App() {
         return;
       }
 
-      // 2. Handle Chat (Uses secretKeyRef.current to avoid stale closures)
       if (parsed.type === "chat") {
-        let decryptedMessage = parsed.message;
-        try {
-          // 🚨 FIX 2: Use the Ref here, not the state variable
-          const bytes = AES.decrypt(parsed.message, secretKeyRef.current);
-          const originalText = bytes.toString(enc);
-          if (originalText) {
-            decryptedMessage = originalText;
+        let finalMessage = parsed.message;
+        let isEncryptedError = false;
+
+        // 🧠 SMART DECRYPTION LOGIC
+        // 1. Check if it LOOKS like AES (starts with U2F)
+        if (parsed.message.startsWith("U2F")) {
+          try {
+            const currentKey = roomIdRef.current || "default";
+            const bytes = AES.decrypt(parsed.message, currentKey);
+            const decrypted = bytes.toString(enc);
+
+            if (decrypted) {
+              finalMessage = decrypted;
+            } else {
+              // Decryption produced empty string -> Wrong Key
+              isEncryptedError = true;
+              console.warn("Decryption failed (Wrong Key)");
+            }
+          } catch (e) {
+            isEncryptedError = true;
           }
-        } catch (e) {
-          console.log("Decryption failed:", e);
-          decryptedMessage = "🔒 Encrypted Message (Wrong Key)";
+        } else {
+          // 2. It's plain text
+          // Just show it as is!
+          finalMessage = parsed.message;
         }
 
         setMessages((prev) => [
           ...prev,
-          { label: parsed.label, message: decryptedMessage },
+          {
+            label: parsed.label,
+            message: finalMessage,
+            isEncrypted: isEncryptedError,
+          },
         ]);
         return;
       }
 
       if (parsed.type === "typing") setOtherIsTyping(parsed.status);
+
       if (parsed.type === "server" && parsed.message === "Room is full.") {
         setRejection("Room is full.");
         ws.close();
@@ -136,17 +139,35 @@ function App() {
 
     ws.onclose = () => {
       setSocket(null);
-      console.log("Disconnected");
     };
 
     return () => ws.close();
-  }, []);
+  }, [roomId]);
 
-  // 4. ENCRYPT OUTGOING MESSAGES
+  // ---- HANDLERS ----
+  const joinRoom = () => {
+    if (roomInput.trim()) setRoomId(roomInput.trim());
+  };
+
+  const leaveRoom = () => {
+    setRoomId(null);
+    setRoomInput("");
+    setMessages([]);
+    setRejection(null);
+    socket?.close();
+  };
+
+  const handleGuestJoin = () => {
+    setRoomInput("default");
+    setRoomId("default");
+  };
+
   const sendMessage = () => {
     if (input.trim() && socket) {
-      // Use Ref here too
-      const encrypted = AES.encrypt(input, secretKeyRef.current).toString();
+      const currentKey = roomIdRef.current || "default";
+      // Encrypt
+      const encrypted = AES.encrypt(input, currentKey).toString();
+
       socket.send(encrypted);
       setOtherIsTyping(false);
       setInput("");
@@ -166,108 +187,150 @@ function App() {
       setIsTyping(false);
       socket?.send(JSON.stringify({ type: "typing", status: false }));
     }, 1200);
+
+    e.target.style.height = "44px";
+    e.target.style.height = `${e.target.scrollHeight}px`;
   };
 
-  if (rejection)
+  // --- Lobby  ---
+  if (!roomId) {
     return (
-      <div className="bg-gray-900 text-slate-300 h-screen flex justify-center items-center border-t-4 border-emerald-500">
-        <span className="animate-pulse rounded-full border-2 p-4 font-sans text-2xl flex items-center">
-          <LucideCheck className="mr-2 text-emerald-500" size={30} />
-          {rejection}
-        </span>
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-950 p-6 text-white font-sans">
+        <div className="w-full max-w-md bg-gray-900 border border-gray-800 p-8 rounded-2xl shadow-2xl">
+          <h1 className="text-3xl font-bold mb-2 text-center bg-gradient-to-r from-emerald-500 to-blue-900 bg-clip-text text-transparent">
+            Cipher Chat
+          </h1>
+          <p className="text-gray-500 text-center mb-8">
+            Create or join a private room.
+          </p>
+          <div className="space-y-4">
+            <div className="bg-gray-950 border border-gray-700 rounded-xl p-3 flex items-center gap-3 focus-within:border-emerald-800 transition-colors">
+              <Hash className="text-gray-500" />
+              <input
+                type="text"
+                placeholder="Enter Room Name"
+                className="bg-transparent outline-none flex-1 text-white placeholder-gray-600"
+                value={roomInput}
+                onChange={(e) => setRoomInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && joinRoom()}
+              />
+            </div>
+            <button
+              onClick={handleGuestJoin}
+              className="w-full bg-emerald-800 hover:bg-emerald-700 cursor-pointer disabled:bg-gray-800 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl transition-all flex items-center justify-center gap-2"
+            >
+              Guest user <ShieldUser size={20} />
+            </button>
+            <button
+              onClick={joinRoom}
+              disabled={!roomInput.trim()}
+              className="w-full bg-emerald-800 hover:bg-emerald-700 cursor-pointer disabled:bg-gray-800 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl transition-all flex items-center justify-center gap-2"
+            >
+              Enter Room <ArrowRight size={20} />
+            </button>
+          </div>
+        </div>
+        <p className="text-xs text-gray-400 text-center mt-6">
+          <span className="text-emerald-500 font-bold">Note:</span> The Room
+          Name acts as your Secret Key.
+          <br />
+          Only people with this exact name can read messages.
+        </p>
       </div>
     );
+  }
+
+  if (rejection) {
+    return (
+      <div className="bg-gray-900 text-white h-screen flex flex-col justify-center items-center gap-4">
+        <span className="text-xl text-red-400">{rejection}</span>
+        <button
+          onClick={leaveRoom}
+          className="px-6 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg"
+        >
+          Back to Lobby
+        </button>
+      </div>
+    );
+  }
 
   if (!socket)
     return (
       <div className="text-white p-10 bg-gray-900 h-screen flex justify-center items-center">
-        <div className="flex flex-col items-center p-6 rounded-lg shadow-lg space-y-3 animate-pulse">
-          <Spinner />
-          <p className="text-xl">Please wait, </p>{" "}
-          <span className="hidden sm:inline">connecting to server...</span>
-        </div>
+        <Spinner />
       </div>
     );
 
+  // --- Main App ---
+
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-950 p-4 font-sans text-gray-100">
-      <Toaster position="top-center" />
       <div className="w-full max-w-lg bg-gray-900/90 backdrop-blur-sm border border-gray-800 rounded-2xl shadow-2xl flex flex-col h-[85vh] overflow-hidden relative">
-        {/* Header - Using the Responsive Fix */}
         <div className="bg-gray-900 border-b border-gray-800 px-[12px] pt-[10px] z-10 shadow-md">
           <div className="flex items-center justify-between mb-3 bg-gray-900 p-2 rounded-xl">
-            {/* LEFT SIDE */}
             <div className="flex items-center gap-3 overflow-hidden">
-              <ShieldCheck className="text-emerald-500 w-8 h-8 flex-shrink-0" />
+              <ShieldCheck
+                onClick={leaveRoom}
+                className="text-emerald-500 w-8 h-8 flex-shrink-0 cursor-pointer"
+              />
               <div className="flex flex-col min-w-0">
                 <h1 className="text-lg font-bold text-white leading-tight truncate">
-                  Secure Chat
+                  Cipher Chat
                 </h1>
                 <div className="flex items-center gap-2 text-xs font-mono mt-0.5">
-                  <div className="flex items-center gap-1 text-emerald-500">
-                    <Lock className="w-3 h-3 animate-pulse" />
-                    <span className="hidden sm:inline animate-pulse">
-                      E2E ENCRYPTED
-                    </span>
-                    <span className="sm:hidden animate-pulse">E2E</span>
+                  <div className="flex items-center gap-1 text-emerald-500 ">
+                    <Lock className="w-3 h-3 animate-pulse" />{" "}
+                    <span className="hidden sm:inline ">ENCRYPTED</span>
                   </div>
                   <span className="text-gray-600">•</span>
                   <div className="flex items-center gap-1 bg-gray-800 px-1.5 py-0.5 rounded-full border border-gray-700">
-                    <Users className="w-3 h-3 text-blue-400" />
-                    <span className="text-blue-300">
-                      {onlineCount}{" "}
-                      <span className="hidden sm:inline">Online</span>
-                    </span>
+                    <Users className="w-3 h-3 text-blue-400" />{" "}
+                    <span className="text-blue-300">{onlineCount} Online</span>
                   </div>
                 </div>
               </div>
             </div>
-
-            {/* RIGHT SIDE */}
-            <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0 ml-2">
+            <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0 ml-2 ">
               <button
                 onClick={() => setShowKeyInput(!showKeyInput)}
-                className={`p-2 rounded-lg transition-colors ${
+                className={`p-2 rounded-lg transition-colors cursor-pointer ${
                   showKeyInput
                     ? "bg-emerald-900/50 text-emerald-400"
                     : "text-gray-400 hover:bg-gray-800"
                 }`}
               >
-                <KeyRound size={18} />
+                <KeyRoundIcon size={18} />
               </button>
               <button
                 onClick={() => setMessages([])}
-                className="p-2 hover:bg-gray-800 rounded-lg text-gray-400"
+                className="p-2 hover:bg-gray-800 rounded-lg text-gray-400 cursor-pointer"
               >
                 <Trash2 size={18} />
               </button>
               <button
-                onClick={() =>
-                  socket?.send(JSON.stringify({ type: "disconnect_all" }))
-                }
-                className="p-2 hover:bg-red-900/30 rounded-lg text-gray-400 hover:text-red-400"
+                onClick={leaveRoom}
+                className="p-2 hover:bg-red-900/30 rounded-lg text-gray-400 hover:text-red-400 cursor-pointer"
               >
                 <LogOut size={18} />
               </button>
             </div>
           </div>
-
           <AnimatePresence>
             {showKeyInput && (
               <motion.div
                 initial={{ height: 0, opacity: 0 }}
                 animate={{ height: "auto", opacity: 1 }}
                 exit={{ height: 0, opacity: 0 }}
-                className="overflow-hidden"
+                className="overflow-hidden "
               >
-                <div className="bg-gray-950 p-2 rounded-lg border border-gray-700 flex items-center gap-2 mt-2">
+                <div className="bg-gray-950 p-2 rounded-lg border border-gray-700 flex items-center gap-2 mt-2 mb-3 hover:border-emerald-600 transition-colors ">
                   <span className="text-xs text-gray-500 whitespace-nowrap">
-                    Secret Key:
+                    Secret Key :
                   </span>
                   <input
                     type="text"
-                    value={keyInputValue}
-                    onChange={(e) => setKeyInputValue(e.target.value)}
+                    readOnly
+                    value={roomInput}
                     className="bg-transparent border-none outline-none text-emerald-400 text-sm w-full font-mono placeholder-gray-700"
                     placeholder="Enter a shared secret..."
                   />
@@ -277,17 +340,12 @@ function App() {
           </AnimatePresence>
         </div>
 
-        {/* Chat Area */}
         <div
           id="msgcontainer"
           className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-gray-800"
         >
           {messages.map((msg, index) => {
             const isMe = msg.label === userLabel;
-            const isEncryptedError = msg.message.includes(
-              "Encrypted Message (Wrong Key)"
-            );
-
             return (
               <motion.div
                 key={index}
@@ -296,9 +354,7 @@ function App() {
                 className={`flex ${isMe ? "justify-end" : "justify-start"}`}
               >
                 <div
-                  className={`flex max-w-[85%] ${
-                    isMe ? "flex-row-reverse" : "flex-row"
-                  }`}
+                  className={`flex max-w-[85%] ${isMe ? "flex-row-reverse" : "flex-row"}`}
                 >
                   <div
                     className={`flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold mx-2 border ${
@@ -307,19 +363,24 @@ function App() {
                         : "bg-blue-900/30 border-blue-800 text-blue-400"
                     }`}
                   >
-                    {msg.label}
+                    {msg.label.includes("User")
+                      ? msg.label.split("-")[1].slice(0, 2)
+                      : msg.label}
                   </div>
                   <div
                     className={`px-4 py-2 rounded-2xl text-sm leading-relaxed shadow-sm break-words whitespace-pre-wrap ${
                       isMe
                         ? "bg-emerald-700 text-white rounded-tr-sm"
-                        : isEncryptedError
-                        ? "bg-red-900/50 text-red-200 border border-red-800 rounded-tl-sm"
-                        : "bg-gray-800 text-gray-200 rounded-tl-sm border border-gray-700"
+                        : msg.isEncrypted
+                          ? "bg-red-900/30 text-red-200 border border-red-800/50 rounded-tl-sm italic"
+                          : "bg-gray-800 text-gray-200 rounded-tl-sm border border-gray-700"
                     }`}
                   >
-                    {isEncryptedError && (
-                      <Lock size={12} className="inline mr-1 mb-0.5" />
+                    {msg.isEncrypted && (
+                      <AlertTriangle
+                        size={12}
+                        className="inline mr-1 mb-0.5 text-red-400"
+                      />
                     )}
                     {msg.message}
                   </div>
@@ -330,10 +391,10 @@ function App() {
           <AnimatePresence>
             {otherIsTyping && (
               <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.9 }}
                 className="flex items-center gap-2 ml-10 mb-4"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
               >
                 <div className="bg-gray-800 border border-gray-700 px-3 py-2 rounded-xl rounded-tl-sm flex gap-1 shadow-sm">
                   <span className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
@@ -349,13 +410,12 @@ function App() {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input Area */}
         <div className="p-4 bg-gray-900 border-t border-gray-800">
           <div className="flex items-end gap-2 bg-gray-950 p-1.5 rounded-xl border border-gray-800 focus-within:border-emerald-600/50 transition-colors">
             <textarea
               ref={inputRef}
               className="flex-1 bg-transparent text-white px-3 py-2.5 min-h-[44px] max-h-[150px] outline-none resize-none placeholder-gray-600 text-sm scrollbar-none"
-              placeholder={`Message with key: ${secretKey.substring(0, 3)}...`}
+              placeholder={`Message in ${roomId.slice(0, 3)}...`}
               value={input}
               rows={1}
               onChange={handleTyping}
@@ -373,9 +433,9 @@ function App() {
             <button
               onClick={sendMessage}
               disabled={!input.trim()}
-              className={`p-2.5 rounded-lg transition-colors ${
+              className={`p-3 mb-0.5 rounded-lg transition-colors ${
                 input.trim()
-                  ? "bg-emerald-600 text-white hover:bg-emerald-500"
+                  ? "bg-emerald-600 text-white hover:bg-emerald-500 cursor-pointer"
                   : "bg-gray-800 text-gray-500 cursor-not-allowed"
               }`}
             >
