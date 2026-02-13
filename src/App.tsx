@@ -52,8 +52,8 @@ function App() {
   // ---- WebSocket Connection ----
   useEffect(() => {
     if (!roomId) return;
-    const url = `ws://localhost:8080?room=${roomId}`;
-    // const url = `https://chat-room-be-4.onrender.com?room=${roomId}`;
+    // const url = `ws://localhost:8080?room=${roomId}`;
+    const url = `https://chat-room-be-4.onrender.com?room=${roomId}`;
 
     const ws = new WebSocket(url);
 
